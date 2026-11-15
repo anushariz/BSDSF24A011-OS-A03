@@ -75,19 +75,21 @@ int handle_builtin(char** arglist) {
         printf("  exit        - terminate the shell\n");
         printf("  cd <dir>    - change the current directory\n");
         printf("  help        - show this help message\n");
-        printf("  jobs        - list background jobs (not yet implemented)\n");
+        printf("  jobs        - list running background jobs\n");
         printf("  history     - show the last %d commands\n", HISTORY_SIZE);
         printf("  !n          - re-run the n-th command from history\n");
         printf("Operators:\n");
         printf("  cmd > file  - send output to a file\n");
         printf("  cmd < file  - read input from a file\n");
         printf("  cmd1 | cmd2 - connect output of cmd1 to input of cmd2\n");
+        printf("  cmd1 ; cmd2 - run cmd1, then cmd2\n");
+        printf("  cmd &       - run cmd in the background\n");
         return 1;
     }
 
-    // jobs: placeholder for now
+    // jobs: list the running background jobs
     if (strcmp(arglist[0], "jobs") == 0) {
-        printf("Job control not yet implemented.\n");
+        jobs_print();
         return 1;
     }
 

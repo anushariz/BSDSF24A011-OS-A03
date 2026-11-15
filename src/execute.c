@@ -30,10 +30,13 @@ static int apply_redirections(command_t* cmd) {
 /*
  * execute_pipeline: run ncmds commands connected by pipes (ncmds may be 1).
  * For every command: create a pipe to the next one (if any), fork, wire up
- * stdin/stdout in the child, then exec. The parent closes its pipe ends and
- * finally waits for all children. Returns the exit status of the last command.
+ * stdin/stdout in the child, then exec. The parent closes its pipe ends.
+ * Foreground: the parent waits for all children and returns the exit status
+ * of the last command. Background: the parent does NOT wait; it records the
+ * last process in the job list and returns immediately.
+ * 'text' is the command text, used for the job list.
  */
-int execute_pipeline(command_t cmds[], int ncmds) {
+int execute_pipeline(command_t cmds[], int ncmds, int background, const char* text) {
     int pipefd[2];
     int prev_read = -1;             // read end of the previous pipe (-1 = none)
     pid_t pids[MAX_CMDS];
@@ -68,6 +71,15 @@ int execute_pipeline(command_t cmds[], int ncmds) {
                 dup2(pipefd[1], STDOUT_FILENO);
                 close(pipefd[1]);
             }
+            // A background job must not read from the terminal and steal
+            // the shell's input, so give it /dev/null as stdin.
+            if (background && i == 0 && cmds[i].infile == NULL) {
+                int devnull = open("/dev/null", O_RDONLY);
+                if (devnull >= 0) {
+                    dup2(devnull, STDIN_FILENO);
+                    close(devnull);
+                }
+            }
             if (apply_redirections(&cmds[i]) < 0) {   // '<' and '>' override the pipe
                 exit(1);
             }
@@ -88,6 +100,16 @@ int execute_pipeline(command_t cmds[], int ncmds) {
             close(pipefd[1]);                      // parent must close the write end,
             prev_read = pipefd[0];                 // otherwise the reader never sees EOF
         }
+    }
+
+    if (background) {                              // do NOT wait: remember the job and return
+        if (started > 0) {
+            int id = jobs_add(pids[started - 1], text);
+            if (id > 0) {
+                printf("[%d] %d\n", id, (int) pids[started - 1]);
+            }
+        }
+        return 0;
     }
 
     int status = 0, last_status = 0;

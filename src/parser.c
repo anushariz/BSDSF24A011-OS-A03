@@ -135,3 +135,63 @@ int parse_pipeline(char** tokens, command_t cmds[]) {
     cmds[n].argv[argc] = NULL;
     return n + 1;
 }
+
+/*
+ * split_line: split a command line into segments at ';' and '&'
+ * (but not inside quotes). A segment that ended with '&' is marked as a
+ * background segment. The separators are overwritten with '\0' inside
+ * 'line' itself, and every segment is trimmed of leading/trailing blanks,
+ * so segs[i].text points INTO line (nothing is copied).
+ * Empty segments are skipped. Returns the number of segments, or -1 on error.
+ */
+int split_line(char* line, segment_t segs[], int max) {
+    int n = 0;
+    char* start = line;          // where the current segment begins
+    char quote = 0;              // 0 = not inside quotes
+
+    for (char* p = line; ; p++) {
+        char c = *p;
+        int is_end = (c == '\0');
+        int is_sep = 0;
+
+        if (!is_end) {
+            if (quote != 0) {
+                if (c == quote) quote = 0;               // closing quote
+            } else if (c == '"' || c == '\'') {
+                quote = c;                               // opening quote
+            } else if (c == ';' || c == '&') {
+                is_sep = 1;
+            }
+        }
+        if (!is_end && !is_sep) continue;
+
+        if (c == '&' && p[1] == '&') {
+            fprintf(stderr, "syntax error: '&&' is not supported\n");
+            return -1;
+        }
+
+        int background = (c == '&');
+        *p = '\0';                                       // end this segment here
+
+        char* text = start;
+        while (*text == ' ' || *text == '\t') text++;    // trim leading blanks
+        char* e = text + strlen(text);
+        while (e > text && (e[-1] == ' ' || e[-1] == '\t')) {
+            *--e = '\0';                                 // trim trailing blanks
+        }
+
+        if (*text != '\0') {                             // skip empty segments
+            if (n >= max) {
+                fprintf(stderr, "error: too many commands on one line\n");
+                return -1;
+            }
+            segs[n].text = text;
+            segs[n].background = background;
+            n++;
+        }
+
+        if (is_end) break;
+        start = p + 1;
+    }
+    return n;
+}
