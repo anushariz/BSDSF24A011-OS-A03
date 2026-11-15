@@ -60,3 +60,56 @@ char** tokenize(char* cmdline) {
     arglist[argnum] = NULL;
     return arglist;
 }
+
+/*
+ * handle_builtin: checks if arglist[0] is a built-in command.
+ * Built-ins must run inside the shell's own process (no fork), because
+ * a child process cannot change the parent's directory or terminate it.
+ * Returns 1 if the command was a built-in (and has been handled),
+ * and 0 if it is not a built-in (the caller then uses fork-exec).
+ */
+int handle_builtin(char** arglist) {
+    if (arglist == NULL || arglist[0] == NULL) {
+        return 0;
+    }
+
+    // exit: terminate the shell gracefully
+    if (strcmp(arglist[0], "exit") == 0) {
+        printf("Shell exited.\n");
+        exit(0);
+    }
+
+    // cd <directory>: change the shell's current working directory
+    if (strcmp(arglist[0], "cd") == 0) {
+        const char* target = arglist[1];
+        if (target == NULL) {              // "cd" alone goes to HOME
+            target = getenv("HOME");
+            if (target == NULL) {
+                fprintf(stderr, "cd: HOME not set\n");
+                return 1;
+            }
+        }
+        if (chdir(target) != 0) {          // chdir() returns -1 on failure
+            perror("cd failed");
+        }
+        return 1;
+    }
+
+    // help: list all built-in commands
+    if (strcmp(arglist[0], "help") == 0) {
+        printf("Built-in commands:\n");
+        printf("  exit        - terminate the shell\n");
+        printf("  cd <dir>    - change the current directory\n");
+        printf("  help        - show this help message\n");
+        printf("  jobs        - list background jobs (not yet implemented)\n");
+        return 1;
+    }
+
+    // jobs: placeholder for now
+    if (strcmp(arglist[0], "jobs") == 0) {
+        printf("Job control not yet implemented.\n");
+        return 1;
+    }
+
+    return 0;   // not a built-in
+}
