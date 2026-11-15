@@ -10,47 +10,6 @@ static int is_blank(const char* s) {
     return 1;
 }
 
-/*
- * run_line: execute one input line.
- * The line is split at ';' and '&' into segments, and the segments are run
- * one after the other. A segment ended by '&' runs in the background.
- */
-static void run_line(char* line) {
-    segment_t segs[MAX_SEGS];
-    int nseg = split_line(line, segs, MAX_SEGS);
-    if (nseg < 0) {
-        return;                                // syntax error, already reported
-    }
-
-    for (int s = 0; s < nseg; s++) {
-        char** tokens = tokenize(segs[s].text);
-        if (tokens == NULL) {
-            continue;                          // empty segment or bad quote
-        }
-
-        command_t cmds[MAX_CMDS];
-        int ncmds = parse_pipeline(tokens, cmds);
-
-        if (ncmds > 0) {
-            if (ncmds == 1 && !segs[s].background && is_builtin(cmds[0].argv[0])) {
-                run_builtin_in_shell(&cmds[0]);        // cd/exit must run in the shell itself
-            } else {
-                execute_pipeline(cmds, ncmds, segs[s].background, segs[s].text);
-            }
-        }
-
-        // Free the memory allocated by tokenize()
-        for (int i = 0; tokens[i] != NULL; i++) {
-            free(tokens[i]);
-        }
-        free(tokens);
-
-        if (ncmds < 0) {
-            break;                             // syntax error: skip the rest of the line
-        }
-    }
-}
-
 int main() {
     char* cmdline;
 
@@ -67,7 +26,7 @@ int main() {
             break;                             // Ctrl+D
         }
 
-        // Handle !n BEFORE splitting and BEFORE saving to history
+        // Handle !n BEFORE anything else and BEFORE saving to history
         if (cmdline[0] == '!') {
             char* end;
             long n = strtol(cmdline + 1, &end, 10);
@@ -89,6 +48,29 @@ int main() {
         }
 
         if (is_blank(cmdline)) {               // nothing to run
+            free(cmdline);
+            continue;
+        }
+
+        // A line that starts with "if" begins a multi-line if-then-else-fi block
+        if (is_if_line(cmdline)) {
+            if_block_t blk;
+            char* full;
+            if (read_if_block(cmdline, &blk, &full) == 0) {
+                add_history(full);             // the whole block as ONE history entry
+                hist_add(full);
+                free(full);
+                execute_if(&blk);
+                free_if_block(&blk);
+            }
+            free(cmdline);
+            continue;
+        }
+
+        // then/else/fi without a matching if
+        const char* stray = stray_keyword(cmdline);
+        if (stray != NULL) {
+            fprintf(stderr, "syntax error: unexpected '%s'\n", stray);
             free(cmdline);
             continue;
         }

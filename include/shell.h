@@ -16,6 +16,7 @@
 #define MAX_CMDS 10         // max commands joined by pipes in one segment
 #define MAX_SEGS 32         // max ';' / '&' separated segments on one line
 #define MAX_JOBS 32         // max background jobs tracked at once
+#define MAX_BLOCK 32        // max commands in the then/else part of an if
 #define HISTORY_SIZE 20
 #define PROMPT "FCIT> "
 
@@ -31,12 +32,25 @@ typedef struct {
 
 /*
  * One segment of a command line, e.g. "sleep 5 &" in "echo hi ; sleep 5 &".
- * text points into the original line (the separators are overwritten by '\0').
+ * From split_line() the text points into the original line; inside an
+ * if_block_t it is a private malloc'd copy.
  */
 typedef struct {
     char* text;                // the command text of this segment
     int background;            // 1 if the segment ended with '&'
 } segment_t;
+
+/*
+ * A parsed if-then-else-fi block.
+ */
+typedef struct {
+    segment_t cond;                    // the command after 'if'
+    segment_t then_cmds[MAX_BLOCK];    // commands between 'then' and 'else'/'fi'
+    int nthen;
+    segment_t else_cmds[MAX_BLOCK];    // commands between 'else' and 'fi'
+    int nelse;
+    int has_else;                      // 1 if an else part was given
+} if_block_t;
 
 // shell.c
 char* read_cmd(char* prompt, FILE* fp);
@@ -50,7 +64,18 @@ int split_line(char* line, segment_t segs[], int max);
 
 // execute.c
 int execute_pipeline(command_t cmds[], int ncmds, int background, const char* text);
-void run_builtin_in_shell(command_t* cmd);
+int run_builtin_in_shell(command_t* cmd);
+
+// runner.c
+int run_segment(char* text, int background);
+void run_line(char* line);
+
+// ifelse.c
+int is_if_line(const char* line);
+const char* stray_keyword(const char* line);
+int read_if_block(const char* first_line, if_block_t* blk, char** full_text);
+void execute_if(if_block_t* blk);
+void free_if_block(if_block_t* blk);
 
 // jobs.c
 int jobs_add(pid_t pid, const char* cmd);

@@ -36,15 +36,15 @@ int is_builtin(const char* name) {
 }
 
 /*
- * handle_builtin: checks if arglist[0] is a built-in command.
+ * handle_builtin: checks if arglist[0] is a built-in command and runs it.
  * Built-ins must run inside the shell's own process (no fork), because
  * a child process cannot change the parent's directory or terminate it.
- * Returns 1 if the command was a built-in (and has been handled),
- * and 0 if it is not a built-in (the caller then uses fork-exec).
+ * Returns -1 if it is NOT a built-in (the caller then uses fork-exec),
+ * otherwise the built-in's exit status (0 = success, non-zero = failure).
  */
 int handle_builtin(char** arglist) {
     if (arglist == NULL || arglist[0] == NULL) {
-        return 0;
+        return -1;
     }
 
     // exit: terminate the shell gracefully
@@ -65,8 +65,9 @@ int handle_builtin(char** arglist) {
         }
         if (chdir(target) != 0) {          // chdir() returns -1 on failure
             perror("cd failed");
+            return 1;
         }
-        return 1;
+        return 0;
     }
 
     // help: list all built-in commands
@@ -84,20 +85,22 @@ int handle_builtin(char** arglist) {
         printf("  cmd1 | cmd2 - connect output of cmd1 to input of cmd2\n");
         printf("  cmd1 ; cmd2 - run cmd1, then cmd2\n");
         printf("  cmd &       - run cmd in the background\n");
-        return 1;
+        printf("Control structure:\n");
+        printf("  if cmd / then ... / else ... / fi\n");
+        return 0;
     }
 
     // jobs: list the running background jobs
     if (strcmp(arglist[0], "jobs") == 0) {
         jobs_print();
-        return 1;
+        return 0;
     }
 
     // history: print stored commands with line numbers
     if (strcmp(arglist[0], "history") == 0) {
         hist_print();
-        return 1;
+        return 0;
     }
 
-    return 0;   // not a built-in
+    return -1;   // not a built-in
 }

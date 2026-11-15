@@ -32,8 +32,8 @@ static int apply_redirections(command_t* cmd) {
  * For every command: create a pipe to the next one (if any), fork, wire up
  * stdin/stdout in the child, then exec. The parent closes its pipe ends.
  * Foreground: the parent waits for all children and returns the exit status
- * of the last command. Background: the parent does NOT wait; it records the
- * last process in the job list and returns immediately.
+ * of the last command (taken with WEXITSTATUS). Background: the parent does
+ * NOT wait; it records the last process in the job list and returns 0.
  * 'text' is the command text, used for the job list.
  */
 int execute_pipeline(command_t cmds[], int ncmds, int background, const char* text) {
@@ -83,8 +83,9 @@ int execute_pipeline(command_t cmds[], int ncmds, int background, const char* te
             if (apply_redirections(&cmds[i]) < 0) {   // '<' and '>' override the pipe
                 exit(1);
             }
-            if (handle_builtin(cmds[i].argv)) {    // built-in inside a pipeline
-                exit(0);
+            int bstatus = handle_builtin(cmds[i].argv);
+            if (bstatus >= 0) {                    // it was a built-in, run inside this child
+                exit(bstatus);
             }
             execvp(cmds[i].argv[0], cmds[i].argv);
             perror("Command not found");           // only reached if execvp fails
@@ -112,11 +113,15 @@ int execute_pipeline(command_t cmds[], int ncmds, int background, const char* te
         return 0;
     }
 
-    int status = 0, last_status = 0;
+    int status = 0, last_status = 1;
     for (int i = 0; i < started; i++) {
         waitpid(pids[i], &status, 0);
-        if (i == started - 1 && WIFEXITED(status)) {
-            last_status = WEXITSTATUS(status);
+        if (i == started - 1) {
+            if (WIFEXITED(status)) {
+                last_status = WEXITSTATUS(status); // the command's real exit code
+            } else {
+                last_status = 128 + WTERMSIG(status);  // killed by a signal
+            }
         }
     }
     return last_status;
@@ -126,14 +131,16 @@ int execute_pipeline(command_t cmds[], int ncmds, int background, const char* te
  * run_builtin_in_shell: run a single built-in (cd, exit, history, ...) inside
  * the shell process itself. If it has < or >, redirect temporarily and restore
  * stdin/stdout afterwards, so the shell keeps working normally.
+ * Returns the built-in's exit status.
  */
-void run_builtin_in_shell(command_t* cmd) {
+int run_builtin_in_shell(command_t* cmd) {
     fflush(stdout);
     int saved_in = dup(STDIN_FILENO);
     int saved_out = dup(STDOUT_FILENO);
+    int status = 1;                 // 1 = failure (e.g. a redirection could not be set up)
 
     if (apply_redirections(cmd) == 0) {
-        handle_builtin(cmd->argv);
+        status = handle_builtin(cmd->argv);
     }
 
     fflush(stdout);                 // write the output into the file BEFORE restoring
@@ -141,4 +148,5 @@ void run_builtin_in_shell(command_t* cmd) {
     dup2(saved_out, STDOUT_FILENO);
     close(saved_in);
     close(saved_out);
+    return status;
 }
