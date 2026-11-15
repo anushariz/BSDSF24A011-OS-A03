@@ -1,19 +1,22 @@
 #include "shell.h"
+#include <readline/readline.h>
+#include <readline/history.h>
 
 int main() {
     char* cmdline;
     char** arglist;
 
-    while ((cmdline = read_cmd(PROMPT, stdin)) != NULL) {
+    init_readline();                           // set up Tab completion
 
-        // Handle !n BEFORE tokenizing and BEFORE saving to history:
-        // replace the "!n" line with the n-th command from history.
+    // readline() shows the prompt, handles line editing, arrow keys and Tab
+    while ((cmdline = readline(PROMPT)) != NULL) {
+
+        // Handle !n BEFORE tokenizing and BEFORE saving to history
         if (cmdline[0] == '!') {
             char* end;
             long n = strtol(cmdline + 1, &end, 10);
             char* recalled = NULL;
 
-            // valid only if digits followed the '!' and nothing else came after
             if (end != cmdline + 1 && *end == '\0') {
                 recalled = hist_get((int) n);
             }
@@ -21,29 +24,28 @@ int main() {
             if (recalled == NULL) {
                 fprintf(stderr, "%s: event not found\n", cmdline);
                 free(cmdline);
-                continue;                      // back to the prompt
+                continue;
             }
 
             free(cmdline);
-            cmdline = strdup(recalled);        // use a copy of the stored command
-            printf("%s\n", cmdline);           // show what is being re-run
+            cmdline = strdup(recalled);
+            printf("%s\n", cmdline);
         }
 
         if ((arglist = tokenize(cmdline)) != NULL) {
-            hist_add(cmdline);                 // store the command in history
+            add_history(cmdline);              // readline history (Up/Down arrows)
+            hist_add(cmdline);                 // our history (history command, !n)
 
-            // Run external command only if it is not a built-in
             if (handle_builtin(arglist) == 0) {
                 execute(arglist);
             }
 
-            // Free the memory allocated by tokenize()
             for (int i = 0; arglist[i] != NULL; i++) {
                 free(arglist[i]);
             }
             free(arglist);
         }
-        free(cmdline);
+        free(cmdline);                         // readline's line is malloc'd
     }
 
     printf("\nShell exited.\n");

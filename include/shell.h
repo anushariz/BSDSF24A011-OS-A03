@@ -26,4 +26,7 @@ void hist_add(const char* cmdline);
 void hist_print(void);
 char* hist_get(int n);
 
+// Readline setup (completion.c)
+void init_readline(void);
+
 #endif // SHELL_H
