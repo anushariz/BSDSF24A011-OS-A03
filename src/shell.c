@@ -20,7 +20,7 @@ char* read_cmd(char* prompt, FILE* fp) {
 }
 
 /* Names of all built-in commands. */
-static const char* builtin_names[] = { "exit", "cd", "help", "jobs", "history", NULL };
+static const char* builtin_names[] = { "exit", "cd", "help", "jobs", "history", "set", NULL };
 
 /* Returns 1 if name is a built-in command, 0 otherwise. */
 int is_builtin(const char* name) {
@@ -79,12 +79,16 @@ int handle_builtin(char** arglist) {
         printf("  jobs        - list running background jobs\n");
         printf("  history     - show the last %d commands\n", HISTORY_SIZE);
         printf("  !n          - re-run the n-th command from history\n");
+        printf("  set         - show all shell variables\n");
         printf("Operators:\n");
         printf("  cmd > file  - send output to a file\n");
         printf("  cmd < file  - read input from a file\n");
         printf("  cmd1 | cmd2 - connect output of cmd1 to input of cmd2\n");
         printf("  cmd1 ; cmd2 - run cmd1, then cmd2\n");
         printf("  cmd &       - run cmd in the background\n");
+        printf("Variables:\n");
+        printf("  NAME=value  - define a variable (no spaces around '=')\n");
+        printf("  $NAME       - use a variable's value in a command\n");
         printf("Control structure:\n");
         printf("  if cmd / then ... / else ... / fi\n");
         return 0;
@@ -93,6 +97,12 @@ int handle_builtin(char** arglist) {
     // jobs: list the running background jobs
     if (strcmp(arglist[0], "jobs") == 0) {
         jobs_print();
+        return 0;
+    }
+
+    // set: print all shell variables
+    if (strcmp(arglist[0], "set") == 0) {
+        var_print_all();
         return 0;
     }
 

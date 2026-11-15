@@ -70,6 +70,12 @@ int run_builtin_in_shell(command_t* cmd);
 int run_segment(char* text, int background);
 void run_line(char* line);
 
+// variables.c
+int is_assignment_line(char** tokens);
+void do_assignments(char** tokens);
+void expand_variables(char** tokens);
+void var_print_all(void);
+
 // ifelse.c
 int is_if_line(const char* line);
 const char* stray_keyword(const char* line);

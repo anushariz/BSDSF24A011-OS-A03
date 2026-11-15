@@ -6,7 +6,7 @@
 #include <readline/history.h>
 
 /* Built-in commands offered when completing the first word of a line. */
-static const char* builtins[] = { "exit", "cd", "help", "jobs", "history", NULL };
+static const char* builtins[] = { "exit", "cd", "help", "jobs", "history", "set", NULL };
 
 /*
  * command_generator: called repeatedly by readline. state == 0 on the first
