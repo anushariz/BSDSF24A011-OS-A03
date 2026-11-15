@@ -36,10 +36,18 @@ int main() {
             add_history(cmdline);              // readline history (Up/Down arrows)
             hist_add(cmdline);                 // our history (history command, !n)
 
-            if (handle_builtin(arglist) == 0) {
-                execute(arglist);
+            command_t cmds[MAX_CMDS];
+            int ncmds = parse_pipeline(arglist, cmds);
+
+            if (ncmds > 0) {
+                if (ncmds == 1 && is_builtin(cmds[0].argv[0])) {
+                    run_builtin_in_shell(&cmds[0]);     // cd/exit must run in the shell itself
+                } else {
+                    execute_pipeline(cmds, ncmds);      // fork-exec-wait (with pipes)
+                }
             }
 
+            // Free the memory allocated by tokenize()
             for (int i = 0; arglist[i] != NULL; i++) {
                 free(arglist[i]);
             }

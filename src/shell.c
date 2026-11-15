@@ -19,46 +19,20 @@ char* read_cmd(char* prompt, FILE* fp) {
     return cmdline;
 }
 
-char** tokenize(char* cmdline) {
-    // Edge case: empty command line
-    if (cmdline == NULL || cmdline[0] == '\0' || cmdline[0] == '\n') {
-        return NULL;
+/* Names of all built-in commands. */
+static const char* builtin_names[] = { "exit", "cd", "help", "jobs", "history", NULL };
+
+/* Returns 1 if name is a built-in command, 0 otherwise. */
+int is_builtin(const char* name) {
+    if (name == NULL) {
+        return 0;
     }
-
-    char** arglist = (char**)malloc(sizeof(char*) * (MAXARGS + 1));
-    for (int i = 0; i < MAXARGS + 1; i++) {
-        arglist[i] = (char*)malloc(sizeof(char) * ARGLEN);
-        bzero(arglist[i], ARGLEN);
-    }
-
-    char* cp = cmdline;
-    char* start;
-    int len;
-    int argnum = 0;
-
-    while (*cp != '\0' && argnum < MAXARGS) {
-        while (*cp == ' ' || *cp == '\t') cp++; // Skip leading whitespace
-        
-        if (*cp == '\0') break; // Line was only whitespace
-
-        start = cp;
-        len = 1;
-        while (*++cp != '\0' && !(*cp == ' ' || *cp == '\t')) {
-            len++;
+    for (int i = 0; builtin_names[i] != NULL; i++) {
+        if (strcmp(name, builtin_names[i]) == 0) {
+            return 1;
         }
-        strncpy(arglist[argnum], start, len);
-        arglist[argnum][len] = '\0';
-        argnum++;
     }
-
-    if (argnum == 0) { // No arguments were parsed
-        for(int i = 0; i < MAXARGS + 1; i++) free(arglist[i]);
-        free(arglist);
-        return NULL;
-    }
-
-    arglist[argnum] = NULL;
-    return arglist;
+    return 0;
 }
 
 /*
@@ -104,6 +78,10 @@ int handle_builtin(char** arglist) {
         printf("  jobs        - list background jobs (not yet implemented)\n");
         printf("  history     - show the last %d commands\n", HISTORY_SIZE);
         printf("  !n          - re-run the n-th command from history\n");
+        printf("Operators:\n");
+        printf("  cmd > file  - send output to a file\n");
+        printf("  cmd < file  - read input from a file\n");
+        printf("  cmd1 | cmd2 - connect output of cmd1 to input of cmd2\n");
         return 1;
     }
 
